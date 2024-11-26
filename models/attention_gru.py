@@ -9,7 +9,6 @@ class AttentionGRU(GRU):
         self.context_size = context_size
         self.device = device
 
-        # Define parameters for attention mechanism
         self.Wa = nn.Parameter(torch.Tensor(hidden_size, context_size))
         self.Ua = nn.Parameter(torch.Tensor(hidden_size, hidden_size))
         self.va = nn.Parameter(torch.Tensor(hidden_size))
@@ -34,10 +33,6 @@ class AttentionGRU(GRU):
             alpha_t: attention weights at time t (batch_size, context_seq_len).
         """
         batch_size, context_seq_len, _ = context.size()
-
-        # Compute energy scores
-        # h: (batch_size, hidden_size)
-        # context: (batch_size, context_seq_len, context_size)
 
         # Expand h to match context sequence length
         h_expanded = h.unsqueeze(1).expand(-1, context_seq_len, -1)  # (batch_size, context_seq_len, hidden_size)
