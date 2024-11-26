@@ -6,21 +6,41 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 from models.attention_gru import AttentionGRU
 from losses.correlation_loss import CorrelationLoss
+import numpy as np
 
 # Read data
 current_dir = os.path.dirname(os.path.abspath(__file__))
 train_path = os.path.join(current_dir, "/pool/btcavax/binance-usdtfutures/trades/btc/2024-01-29.csv")
 test_path = os.path.join(current_dir, "/pool/btcavax/binance-usdtfutures/trades/btc/2024-01-30.csv")
 
-train = pd.read_csv(train_path)
-test = pd.read_csv(test_path)
+train = pd.read_csv(train_path, sep="|")
+test = pd.read_csv(test_path, sep="|")
+
 
 # log returns column, look back 5 rows
 def data_processing(df):
-    pass
+    curr = df.price
+    back1 = df.price.shift(1)
+    back2 = df.price.shift(2)
+    back3 = df.price.shift(3)
+    back4 = df.price.shift(4)
+    back5 = df.price.shift(5)
+    back6 = df.price.shift(6)
+    df["log_returns"] = np.log(curr / back1)
+    df["log_returns_back1"] = np.log(back1 / back2)
+    df["log_returns_back2"] = np.log(back2 / back3)
+    df["log_returns_back3"] = np.log(back3 / back4)
+    df["log_returns_back4"] = np.log(back4 / back5)
+    df["log_returns_back5"] = np.log(back5 / back6)
 
-feature_columns = []
-target_columns = []
+    return df.dropna().head(1000)
+
+
+train = data_processing(train)
+test = data_processing(test)
+
+feature_columns = ["volume", "side", "log_returns_back1", "log_returns_back2", "log_returns_back3", "log_returns_back4", "log_returns_back5"]
+target_columns = ["log_returns"]
 
 train_features = train[feature_columns]
 train_targets = train[target_columns]
@@ -46,7 +66,7 @@ X_train, y_train = create_sequences(train_features, train_targets, seq_length)
 X_test, y_test = create_sequences(test_features, test_targets, seq_length)
 
 device = torch.device("cpu")
-input_size = 4
+input_size = 7
 context_size = input_size  # assuming context comes from the same input features
 hidden_size = 16
 output_size = 2  # meantemp and humidity
