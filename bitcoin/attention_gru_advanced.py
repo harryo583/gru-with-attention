@@ -156,11 +156,11 @@ def plot_predictions(inv_actuals, inv_predictions, title="Predicted vs Actual Pr
 #########################
 
 param_grid = {
-    'hidden_size': [32, 64],
-    'context_size': [3, 5],
-    'learning_rate': [0.001, 0.0005],
-    'alpha': [0.3, 0.5],
-    'num_epochs': [20, 30]
+    'hidden_size': [64],
+    'context_size': [5],
+    'learning_rate': [0.0005],
+    'alpha': [0.5],
+    'num_epochs': [40]
 }
 
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
