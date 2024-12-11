@@ -218,7 +218,6 @@ if best_model_state is not None:
     if not os.path.exists("models"):
         os.makedirs("models")
     torch.save(best_model_state, "models/attention_gru_advanced.pth")
-    print("Best model saved as models/attention_gru_advanced.pth")
 
 # Plot best model results
 plot_training_loss(best_train_losses, title="Training Loss (Best Model)", save_path="best_training_loss_plot.png")
