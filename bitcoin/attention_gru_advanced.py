@@ -40,20 +40,36 @@ df = pd.read_csv(csv_file)
 df = df.sort_values('Date')
 
 features = df[['Open', 'High', 'Low', 'Close', 'Volume']].values
+
+# Split before scaling to avoid lookahead bias
+train_size = int(0.8 * len(features))
+train_data = features[:train_size]
+test_data = features[train_size:]
+
+# Fit the scaler on training data only
 scaler = MinMaxScaler()
-scaled_features = scaler.fit_transform(features)
+scaled_train_data = scaler.fit_transform(train_data)
 
-X, Y = [], []
-for i in range(len(scaled_features) - seq_len):
-    X.append(scaled_features[i:i+seq_len, :])   
-    Y.append(scaled_features[i+seq_len, 3])
+# Apply the same scaler to test data
+scaled_test_data = scaler.transform(test_data)
 
-X = np.array(X)
-Y = np.array(Y)
+# Create sequences for training
+X_train, Y_train = [], []
+for i in range(len(scaled_train_data) - seq_len):
+    X_train.append(scaled_train_data[i:i+seq_len, :])
+    Y_train.append(scaled_train_data[i+seq_len, 3])  # predicting the 'Close' price
 
-train_size = int(0.8 * len(X))
-X_train, Y_train = X[:train_size], Y[:train_size]
-X_test, Y_test = X[train_size:], Y[train_size:]
+X_train = np.array(X_train)
+Y_train = np.array(Y_train)
+
+# Create sequences for testing
+X_test, Y_test = [], []
+for i in range(len(scaled_test_data) - seq_len):
+    X_test.append(scaled_test_data[i:i+seq_len, :])
+    Y_test.append(scaled_test_data[i+seq_len, 3])
+
+X_test = np.array(X_test)
+Y_test = np.array(Y_test)
 
 class BitcoinDataset(Dataset):
     def __init__(self, X, Y):
@@ -159,7 +175,7 @@ param_grid = {
     'hidden_size': [64],
     'context_size': [5],
     'learning_rate': [0.0005],
-    'alpha': [0.25, 0.5, 0.75],
+    'alpha': [0.5],
     'num_epochs': [40]
 }
 
