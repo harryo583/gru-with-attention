@@ -159,7 +159,7 @@ param_grid = {
     'hidden_size': [64],
     'context_size': [5],
     'learning_rate': [0.0005],
-    'alpha': [0.5],
+    'alpha': [0.25, 0.5, 0.75],
     'num_epochs': [40]
 }
 
