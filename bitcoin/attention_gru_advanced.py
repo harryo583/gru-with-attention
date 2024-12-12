@@ -1,3 +1,5 @@
+# NOTE RUN python -m bitcoin.attention_gru_advanced in the ROOT DIRECTORY
+
 import pandas as pd
 import numpy as np
 import torch
@@ -174,12 +176,12 @@ def plot_predictions(inv_actuals, inv_predictions, title="Predicted vs Actual Pr
 param_grid = {
     'hidden_size': [64],
     'context_size': [5],
-    'learning_rate': [0.0005],
-    'alpha': [0.5],
+    'learning_rate': [0.0005, 0.001],
+    'alpha': [0.25, 0.5, 0.75],
     'num_epochs': [40]
 }
 
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 best_mse = float('inf')
@@ -231,12 +233,12 @@ print(f"Best MSE: {best_mse:.4f}")
 
 # Save best model
 if best_model_state is not None:
-    if not os.path.exists("models"):
-        os.makedirs("models")
-    torch.save(best_model_state, "models/attention_gru_advanced.pth")
+    if not os.path.exists("saved_models"):
+        os.makedirs("saved_models")
+    torch.save(best_model_state, "saved_models/attention_gru_advanced.pth")
 
-# Plot best model results
+# Plot
 plot_training_loss(best_train_losses, title="Training Loss (Best Model)", save_path="best_training_loss_plot.png")
-plot_predictions(best_inv_actuals, best_inv_predictions, title="Predicted vs Actual Prices (Best Model)", save_path="plots/best_predicted_vs_actual_prices.png")
+plot_predictions(best_inv_actuals, best_inv_predictions, title="Predicted vs Actual Prices", save_path="plots/best_predicted_vs_actual_prices_2.png")
 
 print("All done!")

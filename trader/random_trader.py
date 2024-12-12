@@ -42,7 +42,6 @@ for i in range(start_day, end_day):
     today_open = test_opens[i]
     today_close = test_closes[i]
 
-    # Random decision: Buy (1) or Sell (0)
     decision = random.choice([0, 1])
 
     if decision == 1:  # Buy
@@ -52,9 +51,9 @@ for i in range(start_day, end_day):
 
     capital_over_time.append(current_capital)
 
-############################
-# Plot the Trader's Returns
-############################
+#######
+# Plot
+#######
 plt.figure(figsize=(10, 6))
 plt.plot(range(1, len(capital_over_time) + 1), capital_over_time, marker='o', label='Trader Capital')
 plt.title(f'Returns over {window_size}-day window')

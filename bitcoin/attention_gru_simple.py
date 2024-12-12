@@ -1,4 +1,4 @@
-# NOTE RUN python -m tests.bitcoin_test in the ROOT DIRECTORY
+# NOTE RUN python -m bitcoin.attention_gru_simple in the ROOT DIRECTORY
 
 import pandas as pd
 import numpy as np
@@ -68,7 +68,7 @@ class BitcoinDataset(Dataset):
 train_dataset = BitcoinDataset(X_train, Y_train)
 test_dataset = BitcoinDataset(X_test, Y_test)
 
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 ############################
@@ -144,8 +144,7 @@ print(f"Test MSE: {mse:.4f}")
 #############
 # Save Model
 #############
-torch.save(model.state_dict(), "models/attention_gru.pth")
-print("Model saved as models/attention_gru.pth")
+torch.save(model.state_dict(), "saved_models/attention_gru.pth")
 
 #####################
 # Plot Training Loss
