@@ -1,14 +1,26 @@
-# NOTE RUN python -m tests.bitcoin_test in the ROOT DIRECTORY
-
 import pandas as pd
 import numpy as np
 import torch
+import torch.nn as nn
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import MinMaxScaler
+from itertools import product
+import random
+import os
+
 from models.attention_gru import AttentionGRU
 from losses.hybrid_loss import HybridLoss
-from losses.correlation_loss import CorrelationLoss
+
+# Set random seed for reproducibility
+def set_seed(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+set_seed(42)
 
 #############
 # Parameters
@@ -16,13 +28,8 @@ from losses.correlation_loss import CorrelationLoss
 csv_file = "datasets/BTC-USD.csv"
 seq_len = 30
 batch_size = 32
-hidden_size = 64
-context_size = 5
 input_size = 5
 output_size = 1
-num_epochs = 30
-learning_rate = 0.001
-alpha = 0.5
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 #################################
@@ -68,25 +75,11 @@ class BitcoinDataset(Dataset):
 train_dataset = BitcoinDataset(X_train, Y_train)
 test_dataset = BitcoinDataset(X_test, Y_test)
 
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+#########################
+# Utility Functions
+#########################
 
-############################
-# Initialize Model and Loss
-############################
-model = AttentionGRU(input_size=input_size, hidden_size=hidden_size, 
-                     context_size=context_size, output_size=output_size, device=device).to(device)
-
-criterion = HybridLoss(alpha=alpha)
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-
-################
-# Training Loop
-################
-
-train_losses = []
-
-for epoch in range(num_epochs):
+def train_one_epoch(model, criterion, optimizer, train_loader):
     model.train()
     total_loss = 0.0
     for x_batch, context_batch, y_batch in train_loader:
@@ -97,80 +90,138 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
         outputs, attn_weights = model(x_batch, context_batch)
         pred = outputs[:, -1, 0]
-        
+
         loss = criterion(pred, y_batch)
         loss.backward()
         optimizer.step()
 
         total_loss += loss.item()
-
     avg_loss = total_loss / len(train_loader)
-    train_losses.append(avg_loss)
-    print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {avg_loss:.4f}")
+    return avg_loss
 
-#############
-# Evaluation
-#############
+def evaluate(model, test_loader, scaler):
+    model.eval()
+    predictions, actuals = [], []
+    with torch.no_grad():
+        for x_batch, context_batch, y_batch in test_loader:
+            x_batch = x_batch.to(device)
+            context_batch = context_batch.to(device)
+            y_batch = y_batch.to(device)
 
-model.eval()
-with torch.no_grad():
-    predictions = []
-    actuals = []
-    for x_batch, context_batch, y_batch in test_loader:
-        x_batch = x_batch.to(device)
-        context_batch = context_batch.to(device)
-        y_batch = y_batch.to(device)
+            outputs, attn_weights = model(x_batch, context_batch)
+            pred = outputs[:, -1, 0]
 
-        outputs, attn_weights = model(x_batch, context_batch)
-        pred = outputs[:, -1, 0]
-        
-        predictions.append(pred.cpu().numpy())
-        actuals.append(y_batch.cpu().numpy())
+            predictions.append(pred.cpu().numpy())
+            actuals.append(y_batch.cpu().numpy())
 
-predictions = np.concatenate(predictions)
-actuals = np.concatenate(actuals)
+    predictions = np.concatenate(predictions)
+    actuals = np.concatenate(actuals)
 
-# Inverse scaling
-dummy = np.zeros((len(predictions), input_size))
-dummy[:,3] = predictions
-inv_predictions = scaler.inverse_transform(dummy)[:,3]
+    # Inverse scaling
+    dummy = np.zeros((len(predictions), input_size))
+    dummy[:,3] = predictions
+    inv_predictions = scaler.inverse_transform(dummy)[:,3]
 
-dummy[:,3] = actuals
-inv_actuals = scaler.inverse_transform(dummy)[:,3]
+    dummy[:,3] = actuals
+    inv_actuals = scaler.inverse_transform(dummy)[:,3]
 
-mse = np.mean((inv_predictions - inv_actuals)**2)
-print(f"Test MSE: {mse:.4f}")
+    mse = np.mean((inv_predictions - inv_actuals)**2)
+    return mse, inv_predictions, inv_actuals
 
-#############
-# Save Model
-#############
-torch.save(model.state_dict(), "models/attention_gru.pth")
-print("Model saved as models/attention_gru.pth")
+def plot_training_loss(train_losses, title="Training Loss over Epochs", save_path="training_loss_plot.png"):
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(1, len(train_losses) + 1), train_losses, marker='o', label='Training Loss')
+    plt.title(title)
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.grid()
+    plt.savefig(save_path)
+    plt.close()
 
-#####################
-# Plot Training Loss
-#####################
-plt.figure(figsize=(10, 6))
-plt.plot(range(1, num_epochs + 1), train_losses, marker='o', label='Training Loss')
-plt.title('Training Loss over Epochs')
-plt.xlabel('Epoch')
-plt.ylabel('Loss')
-plt.legend()
-plt.grid()
-plt.savefig("training_loss_plot.png")
-plt.show()
+def plot_predictions(inv_actuals, inv_predictions, title="Predicted vs Actual Prices", save_path="predicted_vs_actual_prices.png"):
+    plt.figure(figsize=(14, 8))
+    plt.plot(inv_actuals, label="Actual Prices", color="blue", alpha=0.7)
+    plt.plot(inv_predictions, label="Predicted Prices", color="orange", alpha=0.7)
+    plt.title(title)
+    plt.xlabel("Time")
+    plt.ylabel("Price")
+    plt.legend()
+    plt.grid()
+    plt.savefig(save_path)
+    plt.close()
 
+#########################
+# Hyperparameter Grid
+#########################
 
-##########################################
-# Backtesting: Predicted vs Actual Prices
-##########################################
-plt.figure(figsize=(14, 8))
-plt.plot(inv_actuals, label="Actual Prices", color="blue", alpha=0.7)
-plt.plot(inv_predictions, label="Predicted Prices", color="orange", alpha=0.7)
-plt.title("Predicted vs Actual Prices (Backtesting)")
-plt.xlabel("Time")
-plt.ylabel("Price")
-plt.legend()
-plt.grid()
-plt.savefig("plots/predicted_vs_actual_prices.png")
-plt.show()
+param_grid = {
+    'hidden_size': [64],
+    'context_size': [5],
+    'learning_rate': [0.0005],
+    'alpha': [0.25, 0.5, 0.75],
+    'num_epochs': [40]
+}
+
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+best_mse = float('inf')
+best_params = None
+best_model_state = None
+results = []
+
+for hidden_size, context_size, learning_rate, alpha, num_epochs in product(*param_grid.values()):
+    print(f"\nTesting configuration: hidden_size={hidden_size}, context_size={context_size}, "
+          f"learning_rate={learning_rate}, alpha={alpha}, num_epochs={num_epochs}")
+
+    # Initialize model and training components
+    model = AttentionGRU(input_size=input_size, hidden_size=hidden_size, 
+                         context_size=context_size, output_size=output_size, device=device).to(device)
+    criterion = HybridLoss(alpha=alpha)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    train_losses = []
+    for epoch in range(num_epochs):
+        avg_loss = train_one_epoch(model, criterion, optimizer, train_loader)
+        train_losses.append(avg_loss)
+
+    mse, inv_predictions, inv_actuals = evaluate(model, test_loader, scaler)
+
+    print(f"Configuration MSE: {mse:.4f}")
+
+    # Check for best model
+    if mse < best_mse:
+        best_mse = mse
+        best_params = {
+            'hidden_size': hidden_size,
+            'context_size': context_size,
+            'learning_rate': learning_rate,
+            'alpha': alpha,
+            'num_epochs': num_epochs
+        }
+        best_model_state = model.state_dict().copy()
+        best_train_losses = train_losses[:]
+        best_inv_predictions = inv_predictions
+        best_inv_actuals = inv_actuals
+
+    results.append((hidden_size, context_size, learning_rate, alpha, num_epochs, mse))
+
+# Print best result
+print("\nBest Configuration:")
+for k, v in best_params.items():
+    print(f"{k}: {v}")
+print(f"Best MSE: {best_mse:.4f}")
+
+# Save best model
+if best_model_state is not None:
+    if not os.path.exists("models"):
+        os.makedirs("models")
+    torch.save(best_model_state, "models/attention_gru_advanced.pth")
+    print("Best model saved as models/attention_gru_advanced.pth")
+
+# Plot best model results
+plot_training_loss(best_train_losses, title="Training Loss (Best Model)", save_path="best_training_loss_plot.png")
+plot_predictions(best_inv_actuals, best_inv_predictions, title="Predicted vs Actual Prices (Best Model)", save_path="plots/best_predicted_vs_actual_prices.png")
+
+print("All done!")

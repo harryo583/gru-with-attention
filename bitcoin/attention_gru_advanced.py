@@ -179,7 +179,7 @@ param_grid = {
     'num_epochs': [40]
 }
 
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 best_mse = float('inf')
@@ -237,6 +237,6 @@ if best_model_state is not None:
 
 # Plot best model results
 plot_training_loss(best_train_losses, title="Training Loss (Best Model)", save_path="best_training_loss_plot.png")
-plot_predictions(best_inv_actuals, best_inv_predictions, title="Predicted vs Actual Prices (Best Model)", save_path="plots/best_predicted_vs_actual_prices.png")
+plot_predictions(best_inv_actuals, best_inv_predictions, title="Predicted vs Actual Prices (Best Model)", save_path="plots/best_predicted_vs_actual_prices_2.png")
 
 print("All done!")
