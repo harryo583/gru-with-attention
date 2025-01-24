@@ -29,7 +29,11 @@ class AttentionGRU(GRU):
         self.initialize_attention()
 
     def initialize_attention(self):
-        """Initialize attention parameters."""
+        """
+        Initialize the attention parameters using a uniform distribution.
+
+        The parameters are initialized within a range determined by the hidden size.
+        """
         stdv = 1.0 / (self.hidden_size ** 0.5)
         nn.init.uniform_(self.Wa, -stdv, stdv)
         nn.init.uniform_(self.Ua, -stdv, stdv)
